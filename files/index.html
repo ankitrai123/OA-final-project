@@ -1,0 +1,840 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Service Line — Restaurant Operations Console</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="vendor/chart.umd.js"></script>
+<script src="vendor/xlsx.full.min.js"></script>
+<style>
+:root{
+  --bg:#F1F2EE; --panel:#FFFFFF; --panel2:#E9EBE5; --rule:#D7DBD2;
+  --ink:#191C19; --mute:#5B615C; --dim:#8B928C;
+  --lamp:#B65C0B; --fill:#E89A16; --mint:#0F766E; --alert:#B42318;
+  --hover:#F7F8F5; --shadow:0 1px 2px rgba(25,28,25,.04); --glow:rgba(182,92,11,.15); --sendText:#FFFFFF;
+  --disp:'Archivo',system-ui,sans-serif;
+  --body:'Inter',system-ui,sans-serif;
+  --mono:'IBM Plex Mono',ui-monospace,monospace;
+}
+html[data-theme="dark"]{
+  --bg:#0F1418; --panel:#171E24; --panel2:#1D262D; --rule:#37424C;
+  --ink:#E8EDF1; --mute:#96A2AC; --dim:#5E6D79;
+  --lamp:#F0A21E; --fill:#F0A21E; --mint:#2FB39A; --alert:#FF6B58;
+  --hover:#222C34; --shadow:0 1px 2px rgba(0,0,0,.35); --glow:rgba(240,162,30,.18); --sendText:#12161A;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--ink);font-family:var(--body);-webkit-font-smoothing:antialiased}
+button,input,select,textarea{font-family:inherit;color:inherit}
+button{cursor:pointer;border:none;background:none}
+
+/* ---------- heat lamp rail (signature) ---------- */
+.lamp{position:fixed;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,transparent,var(--fill),transparent);z-index:60}
+.lamp::after{content:"";position:absolute;inset:0 0 auto;height:46px;background:radial-gradient(ellipse 55% 100% at 50% 0%,rgba(232,154,22,.14),transparent 72%);pointer-events:none}
+
+.shell{height:100%;display:grid;grid-template-rows:64px 46px 1fr 26px;padding:0 26px}
+
+/* ---------- header ---------- */
+header{display:flex;align-items:center;gap:20px;border-bottom:1px solid var(--rule)}
+.mark{font-family:var(--disp);font-weight:700;font-size:19px;letter-spacing:.14em;text-transform:uppercase}
+.mark span{color:var(--lamp)}
+.sub{font-family:var(--mono);font-size:11px;color:var(--dim);letter-spacing:.08em;text-transform:uppercase;padding-left:16px;border-left:1px solid var(--rule)}
+.spacer{flex:1}
+.tool{font-family:var(--mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--mute);border:1px solid var(--rule);padding:8px 13px;border-radius:3px;transition:.15s}
+.tool:hover{color:var(--ink);border-color:var(--lamp)}
+.src{font-family:var(--mono);font-size:10.5px;color:var(--dim);letter-spacing:.05em}
+.src b{color:var(--mint);font-weight:500}
+
+/* ---------- ticket rail nav ---------- */
+nav{display:flex;align-items:flex-start;gap:5px;position:relative}
+nav::before{content:"";position:absolute;top:0;left:0;right:0;height:1px;background:var(--rule)}
+.tk{position:relative;top:0;padding:9px 17px 8px;background:var(--panel2);border:1px solid var(--rule);border-top:2px solid var(--rule);border-radius:0 0 3px 3px;
+  font-family:var(--mono);font-size:11px;letter-spacing:.11em;text-transform:uppercase;color:var(--dim);transition:.15s}
+.tk i{font-style:normal;color:var(--rule);margin-right:8px}
+.tk:hover{color:var(--mute);background:var(--hover)}
+.tk.on{color:var(--ink);background:var(--panel);border-top-color:var(--fill);box-shadow:var(--shadow)}
+.tk.on i{color:var(--lamp)}
+
+/* ---------- pages ---------- */
+main{position:relative;overflow:hidden}
+.page{position:absolute;inset:0;padding:22px 0 6px;display:none;grid-template-rows:auto 1fr;gap:18px}
+.page.on{display:grid;animation:in .28s ease both}
+@keyframes in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.page.on{animation:none}}
+
+.ph{display:flex;align-items:flex-end;gap:16px}
+.ph h1{font-family:var(--disp);font-size:27px;font-weight:600;letter-spacing:-.01em}
+.ph p{font-size:13.5px;color:var(--mute);padding-bottom:3px}
+
+.grid{display:grid;gap:14px;min-height:0}
+.card{background:var(--panel);border:1px solid var(--rule);border-radius:4px;box-shadow:var(--shadow);padding:18px 20px;min-height:0;display:flex;flex-direction:column}
+.card h2{font-family:var(--mono);font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--dim);margin-bottom:14px;flex:none}
+.cv{position:relative;flex:1;min-height:0}
+
+/* KPI */
+.kpi{justify-content:center}
+.kpi .n{font-family:var(--mono);font-size:44px;font-weight:600;color:var(--lamp);line-height:1;letter-spacing:-.02em}
+.kpi .l{font-family:var(--disp);font-size:14px;font-weight:600;margin-top:12px;letter-spacing:.01em}
+.kpi .d{font-size:12.5px;color:var(--mute);margin-top:6px;line-height:1.5}
+
+/* readout rows */
+.ro{display:flex;justify-content:space-between;align-items:baseline;padding:9px 0;border-bottom:1px solid var(--rule);font-size:13px}
+.ro:last-child{border:none}
+.ro span{color:var(--mute)}
+.ro b{font-family:var(--mono);font-weight:500;color:var(--ink);font-size:14px}
+.ro b.hi{color:var(--lamp)}
+.ro b.ok{color:var(--mint)}
+
+/* sliders */
+.ctl{margin-bottom:20px}
+.ctl label{display:flex;justify-content:space-between;font-size:12.5px;color:var(--mute);margin-bottom:9px}
+.ctl label b{font-family:var(--mono);color:var(--lamp);font-weight:500}
+input[type=range]{-webkit-appearance:none;width:100%;height:2px;background:var(--rule);border-radius:2px;outline:none}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:var(--lamp);cursor:grab;box-shadow:0 0 0 4px var(--glow)}
+input[type=range]:focus-visible{box-shadow:0 0 0 2px var(--lamp)}
+
+.big{font-family:var(--mono);font-size:56px;font-weight:600;color:var(--lamp);line-height:1}
+.bigl{font-size:13px;color:var(--mute);margin-top:10px;line-height:1.5}
+
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);text-align:right;padding:0 0 9px;font-weight:500}
+th:first-child,td:first-child{text-align:left}
+td{padding:8px 0;border-top:1px solid var(--rule);text-align:right;font-family:var(--mono);color:var(--ink)}
+td:first-child{font-family:var(--body);color:var(--mute)}
+tr.f td{color:var(--lamp);border-top:1px solid var(--rule)}
+
+.note{font-size:12px;color:var(--dim);line-height:1.6;margin-top:auto;padding-top:14px}
+.warn{color:var(--lamp)}
+
+/* analyst */
+.chat{display:flex;flex-direction:column;gap:12px;overflow-y:auto;flex:1;padding-right:8px}
+.chat::-webkit-scrollbar{width:5px}.chat::-webkit-scrollbar-thumb{background:var(--rule);border-radius:3px}
+.msg{max-width:82%;padding:11px 15px;border-radius:4px;font-size:13.5px;line-height:1.65;white-space:pre-wrap}
+.msg.u{align-self:flex-end;background:var(--panel2);border:1px solid var(--rule);color:var(--ink)}
+.msg.a{align-self:flex-start;background:transparent;border-left:2px solid var(--lamp);padding-left:14px}
+.msg.e{align-self:flex-start;border-left:2px solid var(--alert);padding-left:14px;color:var(--alert)}
+.ask{display:flex;gap:9px;margin-top:14px;flex:none}
+.ask input{flex:1;background:var(--panel);border:1px solid var(--rule);border-radius:3px;padding:11px 14px;font-size:13.5px;outline:none}
+.ask input:focus{border-color:var(--lamp)}
+.send{background:var(--lamp);color:var(--sendText);font-weight:600;font-size:12.5px;padding:0 20px;border-radius:3px;letter-spacing:.03em}
+.send:disabled{opacity:.4;cursor:not-allowed}
+.chips{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:14px;flex:none}
+.chip{font-size:11.5px;color:var(--mute);border:1px solid var(--rule);padding:6px 11px;border-radius:20px;transition:.15s}
+.chip:hover{color:var(--lamp);border-color:var(--lamp)}
+.key{background:var(--panel);border:1px solid var(--rule);border-radius:3px;padding:10px 13px;font-family:var(--mono);font-size:12px;width:100%;outline:none;letter-spacing:.02em}
+.key:focus{border-color:var(--lamp)}
+select.key{cursor:pointer}
+.sec{font-size:11.5px;color:var(--dim);line-height:1.65;margin-top:14px;padding-top:14px;border-top:1px solid var(--rule)}
+.dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--dim);margin-right:7px}
+.dot.live{background:var(--mint)}
+
+footer{display:flex;align-items:center;gap:18px;font-family:var(--mono);font-size:10px;color:var(--dim);letter-spacing:.07em;text-transform:uppercase;border-top:1px solid var(--rule)}
+kbd{border:1px solid var(--rule);border-radius:2px;padding:1px 5px;font-family:var(--mono);font-size:9.5px}
+</style>
+</head>
+<body>
+<div class="lamp"></div>
+<div class="shell">
+
+<header>
+  <div class="mark">Service <span>Line</span></div>
+  <div class="sub">Restaurant Operations Console</div>
+  <div class="spacer"></div>
+  <div class="src" id="src"><span class="dot live"></span>Data source: <b>built-in baseline</b></div>
+  <button class="tool" id="bTheme" title="Switch between light and dark">Dark</button>
+  <button class="tool" id="bUp">Load Excel</button>
+  <button class="tool" id="bDn">Export plan</button>
+  <input type="file" id="file" accept=".xlsx,.xls" hidden>
+</header>
+
+<nav id="nav"></nav>
+
+<main id="main">
+
+<!-- 1 LINE -->
+<section class="page on" data-p="line">
+  <div class="ph"><h1>The line, at a glance</h1><p>Four decisions this console keeps current.</p></div>
+  <div class="grid" style="grid-template-rows:auto 1fr;grid-template-columns:repeat(4,1fr)">
+    <div class="card kpi"><div class="n">3.15<span style="font-size:26px">×</span></div><div class="l">Lollipop → wings</div><div class="d">Ordered together 3× more than chance. The only pair worth bundling.</div></div>
+    <div class="card kpi"><div class="n" id="k2">32</div><div class="l">Pizzas a day</div><div class="d">Two above average demand, because running out costs more than waste.</div></div>
+    <div class="card kpi"><div class="n" id="k3">69</div><div class="l">Units held spare</div><div class="d">Cover for busy days and late deliveries at a 95% service level.</div></div>
+    <div class="card kpi"><div class="n" id="k4">15.16<span style="font-size:22px">L</span></div><div class="l">Weekly supplier bill</div><div class="d">The cheapest plan available given what each supplier can deliver.</div></div>
+    <div class="card" style="grid-column:span 2"><h2>Where the money moves</h2><div class="cv"><canvas id="cLine"></canvas></div></div>
+    <div class="card" style="grid-column:span 2"><h2>Standing instructions</h2>
+      <div class="ro"><span>Menu</span><b>Bundle lollipops with wings</b></div>
+      <div class="ro"><span>Kitchen</span><b>Prep <span id="i2">32</span> pizzas daily</b></div>
+      <div class="ro"><span>Stock</span><b>Reorder at <span id="i3">137</span> units</b></div>
+      <div class="ro"><span>Buying</span><b>Vegetables → Local Farm</b></div>
+      <div class="ro"><span>Forecast</span><b class="hi">Rebuild for seasonality</b></div>
+      <h2 style="margin:22px 0 12px">What sits behind these</h2>
+      <div class="ro"><span>Sales history used</span><b>24 months</b></div>
+      <div class="ro"><span>Menu items tracked</span><b>6</b></div>
+      <div class="ro"><span>Forecast models compared</span><b>9</b></div>
+      <div class="ro"><span>Buying decisions solved</span><b>12</b></div>
+      <p class="note">Every figure recalculates from the model pages. Load your Excel file to drive the supplier plan from live costs.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 2 PAIRS -->
+<section class="page" data-p="pairs">
+  <div class="ph"><h1>What sells together</h1><p>Association rules mined from 24 months of bills.</p></div>
+  <div class="grid" style="grid-template-columns:1.35fr 1fr">
+    <div class="card"><h2>Lift — strength of the link</h2><div class="cv"><canvas id="cLift"></canvas></div>
+      <p class="note">Lift above 1 means a genuine link. The pizza pairs sit near 1 because the pizza is in two of every three bills — it pairs with everything.</p></div>
+    <div class="card"><h2>Rule detail</h2>
+      <table><thead><tr><th>Pair</th><th>Support</th><th>Conf.</th><th>Lift</th></tr></thead><tbody>
+        <tr class="f"><td>Lollipop → Wings</td><td>0.2142</td><td>0.8219</td><td>3.150</td></tr>
+        <tr><td>Wings → Lollipop</td><td>0.2142</td><td>0.8208</td><td>3.150</td></tr>
+        <tr><td>Cold Coffee → Pizza</td><td>0.3216</td><td>0.8733</td><td>1.293</td></tr>
+        <tr><td>Pizza → Cold Coffee</td><td>0.3216</td><td>0.4761</td><td>1.293</td></tr>
+        <tr><td>Mojito → Pizza</td><td>0.3212</td><td>0.8645</td><td>1.280</td></tr>
+        <tr><td>Pizza → Mojito</td><td>0.3212</td><td>0.4755</td><td>1.280</td></tr>
+      </tbody></table>
+      <p class="note"><b>Support</b> how often the pair appears · <b>Confidence</b> the follow-on rate · <b>Lift</b> that rate against chance. Minimum support 5%.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 3 DEMAND -->
+<section class="page" data-p="demand">
+  <div class="ph"><h1>Cold coffee demand</h1><p>ARIMA(1,1,0), twelve weeks ahead.</p></div>
+  <div class="grid" style="grid-template-columns:1.5fr 1fr">
+    <div class="card"><h2>Forecast and upper range</h2><div class="cv"><canvas id="cFc"></canvas></div></div>
+    <div class="card"><h2>How the model was chosen</h2>
+      <div class="ro"><span>Differencing (d)</span><b>1</b></div>
+      <div class="ro"><span>Autoregressive (p)</span><b>1</b></div>
+      <div class="ro"><span>Moving average (q)</span><b>0</b></div>
+      <div class="ro"><span>AIC — lowest of 9</span><b class="ok">794.4</b></div>
+      <div class="ro"><span>Ljung-Box p</span><b class="ok">0.893</b></div>
+      <div class="ro"><span>Average error (MAPE)</span><b class="hi">36%</b></div>
+      <p class="note"><span class="warn">Read with care.</span> The range widens every week and the model can't see the April–June summer peak. Use it to set weekly order sizes, not daily production.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 4 PREP -->
+<section class="page" data-p="prep">
+  <div class="ph"><h1>Daily prep target</h1><p>Move the sliders — the target recalculates instantly.</p></div>
+  <div class="grid" style="grid-template-columns:.85fr 1.15fr .8fr">
+    <div class="card"><h2>Adjust the economics</h2>
+      <div class="ctl"><label>Sale price <b id="lP">₹230</b></label><input type="range" id="sP" min="150" max="400" step="5" value="230"></div>
+      <div class="ctl"><label>Cost to make <b id="lC">₹90</b></label><input type="range" id="sC" min="40" max="180" step="5" value="90"></div>
+      <div class="ctl"><label>Average daily demand <b id="lM">29.6</b></label><input type="range" id="sM" min="15" max="60" step="0.5" value="29.6"></div>
+      <div class="ctl"><label>How much demand swings <b id="lS">7.8</b></label><input type="range" id="sS" min="2" max="20" step="0.5" value="7.8"></div>
+      <div class="ro" style="margin-top:8px"><span>Target</span><b>average + nudge for shortage</b></div>
+      <p class="note">Salvage value is zero — an unsold pizza is written off at the end of service. The dashed line marks the profit at the exact optimum.</p>
+    </div>
+    <div class="card"><h2>Profit against quantity prepared</h2><div class="cv"><canvas id="cNv"></canvas></div></div>
+    <div class="card"><h2>Today's target</h2>
+      <div style="flex:1;display:flex;flex-direction:column;justify-content:center">
+      <div class="big" id="qStar">32</div>
+      <div class="bigl">pizzas a day — rounded up, because making too few is the costlier mistake.</div>
+      <div style="margin-top:22px">
+        <div class="ro"><span>Lost profit if short</span><b id="rCu">₹140</b></div>
+        <div class="ro"><span>Cost if wasted</span><b id="rCo">₹90</b></div>
+        <div class="ro"><span>Balance point</span><b id="rCr">60.9%</b></div>
+        <div class="ro"><span>Exact optimum</span><b id="rQ">31.79</b></div>
+      </div></div>
+    </div>
+  </div>
+</section>
+
+<!-- 5 STOCK -->
+<section class="page" data-p="stock">
+  <div class="ph"><h1>Reorder policy</h1><p>What higher cover really costs.</p></div>
+  <div class="grid" style="grid-template-columns:1.4fr 1fr;grid-template-rows:1.15fr .85fr">
+    <div class="card" style="grid-column:1"><h2>What each extra point of cover costs</h2><div class="cv"><canvas id="cCurve"></canvas></div></div>
+    <div class="card" style="grid-column:1"><h2>Spare stock held per item</h2><div class="cv"><canvas id="cSs"></canvas></div></div>
+    <div class="card" style="grid-column:2;grid-row:1 / span 2"><h2>Choose your cover</h2>
+      <div class="ctl"><label>Service level <b id="lSl">95%</b></label><input type="range" id="sSl" min="80" max="99" step="1" value="95"></div>
+      <div class="ro"><span>Safety factor</span><b id="rZ">1.645</b></div>
+      <div class="ro"><span>Total spare units</span><b id="rTot">415</b></div>
+      <div class="ro"><span>Against 95% baseline</span><b id="rDelta" class="ok">—</b></div>
+      <div class="ro"><span>Reorder pizza at</span><b id="rRop">137</b></div>
+      <p class="note">Every extra percentage point of cover costs more than the one before it. Past 95% the curve turns steep for very little added protection.
+      <br><br><span class="warn">Worth checking:</span> all six items need almost the same buffer, which is unusual for a real menu.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 6 SUPPLY -->
+<section class="page" data-p="supply">
+  <div class="ph"><h1>Supplier plan</h1><p>Baseline solution, with sensitivity on the binding constraint.</p></div>
+  <div class="grid" style="grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr">
+    <div class="card" style="grid-row:span 2"><h2>Units to order this week</h2>
+      <table id="tAlloc"></table>
+      <div class="ro" style="margin-top:16px"><span>Weekly bill</span><b class="hi" id="rCost">₹15,15,850</b></div>
+      <p class="note">Local Farm and City Central are fully used; Metro has 750 units to spare. The bottleneck is capacity, not price.</p>
+    </div>
+    <div class="card"><h2>Saving per unit vs next-best supplier</h2><div class="cv"><canvas id="cSav"></canvas></div></div>
+    <div class="card"><h2>If Local Farm could deliver more</h2>
+      <div class="ctl"><label>Local Farm capacity <b id="lCap">350 units</b></label><input type="range" id="sCap" min="0" max="1200" step="50" value="350"></div>
+      <div class="ro"><span>Weekly bill</span><b id="rCap">₹15,15,850</b></div>
+      <div class="ro"><span>Saved vs today</span><b class="ok" id="rSave">₹0</b></div>
+      <div class="ro"><span>Annualised</span><b class="ok" id="rYr">₹0</b></div>
+      <p class="note">Each added unit is spent where the saving is widest — vegetables first, then chicken, then syrups. This is the negotiation worth having.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 7 ANALYST -->
+<section class="page" data-p="analyst">
+  <div class="ph"><h1>Ask the analyst</h1><p>Claude answers using the numbers currently on screen.</p></div>
+  <div class="grid" style="grid-template-columns:1fr 320px">
+    <div class="card">
+      <h2>Conversation</h2>
+      <div class="chips" id="chips"></div>
+      <div class="chat" id="chat">
+        <div class="msg a">Enter your API key on the right and ask me anything about this console. I read the live figures from every page — the prep target, the service level, the supplier plan — so ask "why" and I'll work from your actual numbers.</div>
+      </div>
+      <div class="ask">
+        <input id="q" placeholder="Why 32 pizzas and not 30?" autocomplete="off">
+        <button class="send" id="bSend">Send</button>
+      </div>
+    </div>
+    <div class="card"><h2>Connection</h2>
+      <label style="font-size:12px;color:var(--mute);display:block;margin-bottom:8px">API key</label>
+      <input class="key" id="apiKey" type="password" placeholder="Paste any provider's key" autocomplete="off">
+      <label style="font-size:12px;color:var(--mute);display:block;margin:16px 0 8px">Provider</label>
+      <select class="key" id="prov">
+        <option value="anthropic">Anthropic</option>
+        <option value="openai">OpenAI</option>
+        <option value="nvidia">NVIDIA NIM</option>
+        <option value="google">Google Gemini</option>
+        <option value="openrouter">OpenRouter</option>
+      </select>
+      <label style="font-size:12px;color:var(--mute);display:block;margin:16px 0 8px">Model <span style="color:var(--dim)">— pick one or type any id</span></label>
+      <input class="key" id="model" list="modelList" autocomplete="off" spellcheck="false">
+      <datalist id="modelList"></datalist>
+      <div class="ro" style="margin-top:18px"><span>Status</span><b id="stat"><span class="dot"></span>No key</b></div>
+      <p class="sec">The provider is detected from your key, and you can override it above. Your key is held in this tab's memory only — never saved to the page, to storage, or to disk, and gone the moment you close the tab. Regenerate it afterwards.</p>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <span><kbd>1</kbd>–<kbd>7</kbd> jump to page</span>
+  <span><kbd>←</kbd><kbd>→</kbd> step through</span>
+  <span><kbd>Esc</kbd> leave a field</span>
+  <span class="spacer" style="flex:1"></span>
+  <span id="fnote">Operations Analytics I · Ankit Kumar Rai</span>
+</footer>
+</div>
+
+<script>
+"use strict";
+/* ============ state ============ */
+const CATS = ["Chicken","Vegetables","Dairy","Syrups"];
+const S = {
+  suppliers:[
+    {name:"Local Farm Co.",   cap:350,  cost:[670,640,702,644]},
+    {name:"City Central Market",cap:600, cost:[1548,1551,1468,1643]},
+    {name:"Metro Wholesale",  cap:1000, cost:[1621,1558,1657,1515]}
+  ],
+  demand:[300,450,200,250],
+  nv:{price:230,cost:90,mu:29.63,sd:7.83},
+  sl:95,
+  items:[
+    {n:"BBQ Wings",  ss:69.9, rop:138.1},
+    {n:"Lollipop",   ss:69.5, rop:137.8},
+    {n:"Pizza",      ss:69.4, rop:137.2},
+    {n:"Baby Corn",  ss:69.2, rop:136.7},
+    {n:"Cold Coffee",ss:69.3, rop:136.7},
+    {n:"Mojito",     ss:68.1, rop:134.2}
+  ],
+  fc:[39.9,28.1,33.5,31.0,32.1,31.6,31.9,31.8,31.8,31.8,31.8,31.8],
+  hi:[93.3,88.9,106.3,112.0,121.3,127.9,135.0,141.2,147.2,152.9,158.4,163.6],
+  baseCost:0, apiKey:"", history:[]
+};
+
+/* ============ maths ============ */
+// inverse standard normal (Acklam)
+function invNorm(p){
+  if(p<=0)return -6; if(p>=1)return 6;
+  const a=[-39.69683028665376,220.9460984245205,-275.9285104469687,138.3577518672690,-30.66479806614716,2.506628277459239],
+        b=[-54.47609879822406,161.5858368580409,-155.6989798598866,66.80131188771972,-13.28068155288572],
+        c=[-.007784894002430293,-.3223964580411365,-2.400758277161838,-2.549732539343734,4.374664141464968,2.938163982698783],
+        d=[.007784695709041462,.3224671290700398,2.445134137142996,3.754408661907416], pl=.02425;
+  let q,r;
+  if(p<pl){q=Math.sqrt(-2*Math.log(p));
+    return (((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5])/((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1);}
+  if(p>1-pl){q=Math.sqrt(-2*Math.log(1-p));
+    return -(((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5])/((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1);}
+  q=p-.5;r=q*q;
+  return (((((a[0]*r+a[1])*r+a[2])*r+a[3])*r+a[4])*r+a[5])*q/(((((b[0]*r+b[1])*r+b[2])*r+b[3])*r+b[4])*r+1);
+}
+const nPdf=z=>Math.exp(-z*z/2)/Math.sqrt(2*Math.PI);
+const nCdf=z=>{const t=1/(1+.2316419*Math.abs(z));
+  const y=1-nPdf(z)*t*(.319381530+t*(-.356563782+t*(1.781477937+t*(-1.821255978+t*1.330274429))));
+  return z>=0?y:1-y;};
+// expected profit for newsvendor with normal demand
+function profitAt(Q,p,c,mu,sd){
+  const z=(Q-mu)/sd, L=sd*(nPdf(z)-z*(1-nCdf(z))); // expected shortfall
+  const sold=Q-(sd*(nPdf(z)+z*nCdf(z))-(Q-mu)); // expected sales = Q - expected leftover
+  const leftover=sd*(nPdf(z)+z*nCdf(z))-(Q-mu)*0; // not used directly
+  const expSales=mu-L;
+  return p*expSales-c*Q;
+}
+
+/* ---- min-cost max-flow (transportation) ---- */
+function solveLP(sup,dem){
+  const nS=sup.length,nD=dem.length,N=nS+nD+2,SRC=0,SNK=N-1;
+  const to=[],cap=[],cst=[],nxt=[],head=new Array(N).fill(-1);
+  const add=(u,v,c,w)=>{to.push(v);cap.push(c);cst.push(w);nxt.push(head[u]);head[u]=to.length-1;
+                        to.push(u);cap.push(0);cst.push(-w);nxt.push(head[v]);head[v]=to.length-1;};
+  sup.forEach((s,i)=>add(SRC,1+i,s.cap,0));
+  dem.forEach((d,j)=>add(1+nS+j,SNK,d,0));
+  sup.forEach((s,i)=>dem.forEach((d,j)=>add(1+i,1+nS+j,1e9,s.cost[j])));
+  let flow=0,cost=0;
+  for(;;){
+    const dist=new Array(N).fill(Infinity),inq=new Array(N).fill(false),pe=new Array(N).fill(-1);
+    dist[SRC]=0;const q=[SRC];inq[SRC]=true;
+    while(q.length){const u=q.shift();inq[u]=false;
+      for(let e=head[u];e!==-1;e=nxt[e]){if(cap[e]>0&&dist[u]+cst[e]<dist[to[e]]-1e-9){
+        dist[to[e]]=dist[u]+cst[e];pe[to[e]]=e;if(!inq[to[e]]){inq[to[e]]=true;q.push(to[e]);}}}}
+    if(dist[SNK]===Infinity)break;
+    let f=Infinity;
+    for(let v=SNK;v!==SRC;v=to[pe[v]^1])f=Math.min(f,cap[pe[v]]);
+    for(let v=SNK;v!==SRC;v=to[pe[v]^1]){cap[pe[v]]-=f;cap[pe[v]^1]+=f;}
+    flow+=f;cost+=f*dist[SNK];
+  }
+  const alloc=sup.map(()=>dem.map(()=>0));
+  let e=2*(nS+nD);
+  for(let i=0;i<nS;i++)for(let j=0;j<nD;j++){alloc[i][j]=1e9-cap[e];e+=2;}
+  const need=dem.reduce((a,b)=>a+b,0);
+  return {alloc,cost,feasible:flow>=need-1e-6};
+}
+
+/* ============ format ============ */
+const inr=n=>"₹"+Math.round(n).toLocaleString("en-IN");
+const $=id=>document.getElementById(id);
+
+/* ============ charts ============ */
+const THEMES={
+  light:{text:"#5B615C",grid:"#E2E5DE",border:"#D7DBD2",fill:"#E89A16",neutral:"#B9C0B6",
+         neutralFade:"rgba(185,192,182,.32)",teal:"#0F766E",alert:"#B42318",lamp:"#B65C0B",dim:"#8B928C"},
+  dark: {text:"#96A2AC",grid:"#2B363F",border:"#37424C",fill:"#F0A21E",neutral:"#4A5560",
+         neutralFade:"rgba(74,85,96,.35)",teal:"#2FB39A",alert:"#FF6B58",lamp:"#F0A21E",dim:"#5E6D79"}
+};
+let T=THEMES.light;
+Chart.defaults.color=T.text;
+Chart.defaults.font.family="'IBM Plex Mono',monospace";
+Chart.defaults.font.size=11;
+Chart.defaults.animation.duration=420;
+const GRID=()=>({color:T.grid,drawTicks:false});
+const base=(extra={})=>Object.assign({responsive:true,maintainAspectRatio:false,
+  plugins:{legend:{display:false}},scales:{x:{grid:{display:false},border:{color:T.border}},
+  y:{grid:GRID(),border:{display:false},beginAtZero:true}}},extra);
+const C={};
+
+function buildCharts(){
+  C.lift=new Chart($("cLift"),{type:"bar",data:{labels:["Lollipop\n+ Wings","Coffee\n+ Pizza","Mojito\n+ Pizza"],
+    datasets:[{data:[3.15,1.29,1.28],backgroundColor:[T.fill,T.neutral,T.neutral],borderRadius:2,barPercentage:.55}]},
+    options:base({scales:{x:{grid:{display:false},border:{color:T.border}},y:{grid:GRID(),border:{display:false},beginAtZero:true,max:4,
+      ticks:{callback:v=>v+"×"}}}})});
+
+  C.fc=new Chart($("cFc"),{type:"line",data:{labels:S.fc.map((_,i)=>"W"+(i+1)),
+    datasets:[
+      {label:"Upper range",data:S.hi,borderColor:T.neutral,backgroundColor:T.neutralFade,fill:"+1",tension:.35,pointRadius:0,borderWidth:1.5,borderDash:[4,4]},
+      {label:"Forecast",data:S.fc,borderColor:T.fill,tension:.35,pointRadius:2.5,pointBackgroundColor:T.fill,borderWidth:2.5}
+    ]},options:base({plugins:{legend:{display:true,position:"bottom",labels:{boxWidth:10,boxHeight:10,padding:16}}},
+      scales:{x:{grid:{display:false},border:{color:T.border}},y:{grid:GRID(),border:{display:false},beginAtZero:true,
+        ticks:{callback:v=>v+" cups"}}}})});
+
+  C.nv=new Chart($("cNv"),{type:"line",data:{labels:[],datasets:[
+      {data:[],borderColor:T.fill,tension:.3,pointRadius:0,borderWidth:2.5},
+      {data:[],borderColor:T.teal,borderWidth:1.5,borderDash:[5,4],pointRadius:0}
+    ]},options:base({scales:{x:{grid:{display:false},border:{color:T.border},
+      ticks:{maxTicksLimit:9,callback:function(v){return this.getLabelForValue(v)}}},
+      y:{grid:GRID(),border:{display:false},beginAtZero:false,ticks:{callback:v=>"₹"+v}}}})});
+
+  C.ss=new Chart($("cSs"),{type:"bar",data:{labels:S.items.map(i=>i.n),
+    datasets:[{data:S.items.map(i=>i.ss),backgroundColor:T.fill,borderRadius:2,barPercentage:.6}]},
+    options:base({scales:{x:{grid:{display:false},border:{color:T.border}},y:{grid:GRID(),border:{display:false},beginAtZero:true,
+      ticks:{callback:v=>v+"u"}}}})});
+
+  C.curve=new Chart($("cCurve"),{type:"line",data:{labels:[],datasets:[
+      {data:[],borderColor:T.fill,tension:.3,pointRadius:0,borderWidth:2.5},
+      {data:[],borderColor:T.teal,pointRadius:0,borderWidth:1.5,borderDash:[5,4]}]},
+    options:base({scales:{x:{grid:{display:false},border:{color:T.border},
+      ticks:{maxTicksLimit:10,callback:function(v){return this.getLabelForValue(v)+"%"}}},
+      y:{grid:GRID(),border:{display:false},beginAtZero:false,ticks:{callback:v=>v+"u"}}}})});
+
+  C.sav=new Chart($("cSav"),{type:"bar",data:{labels:CATS,datasets:[{data:[],backgroundColor:[],borderRadius:2,barPercentage:.6}]},
+    options:base({indexAxis:"y",scales:{x:{grid:GRID(),border:{display:false},beginAtZero:true,ticks:{callback:v=>"₹"+v}},
+      y:{grid:{display:false},border:{color:T.border}}}})});
+
+  C.line=new Chart($("cLine"),{type:"bar",data:{labels:CATS,datasets:[
+      {label:"Local Farm",data:[],backgroundColor:T.fill,borderRadius:2},
+      {label:"City Central",data:[],backgroundColor:T.teal,borderRadius:2},
+      {label:"Metro",data:[],backgroundColor:T.neutral,borderRadius:2}]},
+    options:base({plugins:{legend:{display:true,position:"bottom",labels:{boxWidth:10,boxHeight:10,padding:16}}},
+      scales:{x:{stacked:true,grid:{display:false},border:{color:T.border}},
+        y:{stacked:true,grid:GRID(),border:{display:false},beginAtZero:true,ticks:{callback:v=>v+"u"}}}})});
+}
+
+/* ============ page: prep ============ */
+function renderPrep(){
+  const {price,cost,mu,sd}=S.nv;
+  const cu=Math.max(price-cost,1), co=Math.max(cost,1);
+  const cr=cu/(cu+co), z=invNorm(cr), q=mu+z*sd, qr=Math.max(0,Math.round(q));
+  $("lP").textContent="₹"+price; $("lC").textContent="₹"+cost;
+  $("lM").textContent=mu.toFixed(1); $("lS").textContent=sd.toFixed(1);
+  $("rCu").textContent="₹"+cu; $("rCo").textContent="₹"+co;
+  $("rCr").textContent=(cr*100).toFixed(1)+"%"; $("rQ").textContent=q.toFixed(2);
+  $("qStar").textContent=qr; $("k2").textContent=qr; $("i2").textContent=qr;
+  const lo=Math.max(0,Math.round(mu-3*sd)), hi=Math.round(mu+3*sd), labs=[],vals=[];
+  for(let x=lo;x<=hi;x++){labs.push(x);vals.push(profitAt(x,price,cost,mu,sd));}
+  C.nv.data.labels=labs;
+  C.nv.data.datasets[0].data=vals;
+  C.nv.data.datasets[1].data=labs.map(x=>x===qr?Math.max(...vals):null);
+  C.nv.data.datasets[1].data=labs.map(()=>profitAt(q,price,cost,mu,sd));
+  C.nv.update();
+}
+
+/* ============ page: stock ============ */
+function renderStock(){
+  const z=invNorm(S.sl/100), z95=invNorm(.95);
+  let tot=0, rop=0;
+  const vals=S.items.map(it=>{
+    const sigLT=it.ss/z95, lead=it.rop-it.ss, ss=z*sigLT;
+    tot+=ss; if(it.n==="Pizza")rop=lead+ss;
+    return ss;
+  });
+  const base95=S.items.reduce((a,i)=>a+i.ss,0);
+  $("lSl").textContent=S.sl+"%"; $("rZ").textContent=z.toFixed(3);
+  $("rTot").textContent=Math.round(tot)+" units"; $("rRop").textContent=Math.round(rop);
+  const d=tot-base95, pct=(d/base95*100);
+  const el=$("rDelta");
+  el.textContent=(d>=0?"+":"")+Math.round(d)+" units ("+(d>=0?"+":"")+pct.toFixed(0)+"%)";
+  el.className=Math.abs(pct)<1?"ok":(pct>0?"hi":"ok");
+  $("k3").textContent=Math.round(tot/S.items.length);
+  $("i3").textContent=Math.round(rop);
+  const labs=[],curve=[];
+  for(let sl=80;sl<=99;sl++){labs.push(sl);
+    curve.push(+S.items.reduce((a,i)=>a+invNorm(sl/100)*i.ss/z95,0).toFixed(0));}
+  C.curve.data.labels=labs;
+  C.curve.data.datasets[0].data=curve;
+  C.curve.data.datasets[1].data=labs.map(l=>l===S.sl?null:null);
+  C.curve.data.datasets[1].data=labs.map(()=>+tot.toFixed(0));
+  C.curve.update();
+  C.ss.data.datasets[0].data=vals.map(v=>+v.toFixed(1));
+  C.ss.data.datasets[0].backgroundColor=vals.map(()=>S.sl>=98?T.alert:S.sl>=95?T.fill:T.teal);
+  C.ss.update();
+}
+
+/* ============ page: supply ============ */
+function renderSupply(){
+  const r=solveLP(S.suppliers,S.demand);
+  S.baseCost=r.cost;
+  const rows=["<thead><tr><th>Supplier</th>"+CATS.map(c=>"<th>"+c+"</th>").join("")+"<th>Total</th><th>Cap</th></tr></thead><tbody>"];
+  r.alloc.forEach((row,i)=>{
+    const t=row.reduce((a,b)=>a+b,0);
+    const full=t>=S.suppliers[i].cap-.5;
+    rows.push("<tr><td>"+S.suppliers[i].name+"</td>"+row.map(v=>"<td>"+Math.round(v)+"</td>").join("")+
+      "<td>"+Math.round(t)+"</td><td style='color:"+(full?"#B65C0B":"#5E6D79")+"'>"+S.suppliers[i].cap+"</td></tr>");
+  });
+  rows.push("<tr class='f'><td>Delivered</td>"+S.demand.map(d=>"<td>"+d+"</td>").join("")+
+    "<td>"+S.demand.reduce((a,b)=>a+b,0)+"</td><td>—</td></tr></tbody>");
+  $("tAlloc").innerHTML=rows.join("");
+  $("rCost").textContent=r.feasible?inr(r.cost):"Not enough supply";
+  $("k4").textContent=(r.cost/100000).toFixed(2)+"L";
+
+  // saving spread: cheapest supplier vs cheapest excluding Local Farm
+  const spread=CATS.map((_,j)=>{
+    const all=S.suppliers.map(s=>s.cost[j]);
+    const lf=all[0], rest=Math.min(...all.slice(1));
+    return Math.max(0,rest-lf);
+  });
+  const mx=Math.max(...spread);
+  C.sav.data.datasets[0].data=spread;
+  C.sav.data.datasets[0].backgroundColor=spread.map(v=>v===mx?T.fill:T.neutral);
+  C.sav.update();
+
+  C.line.data.datasets.forEach((ds,i)=>ds.data=r.alloc[i].map(v=>Math.round(v)));
+  C.line.update();
+  renderCap();
+}
+function renderCap(){
+  const cap=+$("sCap").value;
+  const alt=S.suppliers.map((s,i)=>i===0?{...s,cap}:s);
+  const r=solveLP(alt,S.demand);
+  $("lCap").textContent=cap+" units";
+  $("rCap").textContent=r.feasible?inr(r.cost):"Not enough supply";
+  const save=S.baseCost-r.cost;
+  $("rSave").textContent=(save>=0?"":"−")+inr(Math.abs(save));
+  $("rYr").textContent=(save>=0?"":"−")+inr(Math.abs(save)*52);
+}
+
+/* ============ excel ============ */
+function loadWorkbook(wb){
+  let hits=0;
+  wb.SheetNames.forEach(nm=>{
+    const rows=XLSX.utils.sheet_to_json(wb.Sheets[nm],{header:1,defval:null});
+    rows.forEach(r=>{
+      if(!r||!r.length)return;
+      const label=String(r[0]??"").toLowerCase().trim();
+      const nums=r.slice(1).filter(v=>typeof v==="number");
+      S.suppliers.forEach(s=>{
+        const key=s.name.split(" ")[0].toLowerCase();
+        if(label.includes(key)&&nums.length>=4){
+          s.cost=nums.slice(0,4).map(Number);
+          if(nums.length>=5)s.cap=Number(nums[4]);
+          hits++;
+        }
+      });
+      if((label.includes("demand")||label.includes("required"))&&nums.length>=4){
+        S.demand=nums.slice(0,4).map(Number); hits++;
+      }
+    });
+  });
+  if(hits){
+    $("src").innerHTML='<span class="dot live"></span>Data source: <b>'+hits+' rows from your file</b>';
+    $("sCap").value=S.suppliers[0].cap;
+    renderSupply();
+  }else{
+    $("src").innerHTML='<span class="dot" style="background:var(--alert)"></span>No supplier rows found — check the sheet layout';
+  }
+}
+$("bUp").onclick=()=>$("file").click();
+$("file").onchange=e=>{
+  const f=e.target.files[0]; if(!f)return;
+  const rd=new FileReader();
+  rd.onload=ev=>{try{loadWorkbook(XLSX.read(ev.target.result,{type:"array"}));}
+    catch(err){$("src").innerHTML='<span class="dot" style="background:var(--alert)"></span>Could not read that file';}};
+  rd.readAsArrayBuffer(f);
+};
+$("bDn").onclick=()=>{
+  const r=solveLP(S.suppliers,S.demand), wb=XLSX.utils.book_new();
+  const a=[["Supplier",...CATS,"Total","Capacity"]];
+  r.alloc.forEach((row,i)=>a.push([S.suppliers[i].name,...row.map(Math.round),Math.round(row.reduce((x,y)=>x+y,0)),S.suppliers[i].cap]));
+  a.push(["Demand",...S.demand,S.demand.reduce((x,y)=>x+y,0),""]);
+  a.push([],["Weekly cost",r.cost]);
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(a),"Supplier plan");
+  const {price,cost,mu,sd}=S.nv, cu=price-cost, cr=cu/(cu+cost);
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([
+    ["Parameter","Value"],["Sale price",price],["Cost to make",cost],["Average demand",mu],["Demand swing",sd],
+    ["Lost profit if short",cu],["Cost if wasted",cost],["Balance point",cr],
+    ["Prep target",Math.round(mu+invNorm(cr)*sd)],[],["Service level",S.sl/100],["Safety factor",invNorm(S.sl/100)]
+  ]),"Prep and stock");
+  XLSX.writeFile(wb,"operations_plan.xlsx");
+};
+
+/* ============ analyst ============ */
+const PRESETS=["Why 32 pizzas and not 30?","Is the lollipop bundle worth a discount?",
+  "What if chicken costs rise 20%?","Explain the reorder point simply","What's the weakest part of this analysis?"];
+PRESETS.forEach(t=>{const b=document.createElement("button");b.className="chip";b.textContent=t;
+  b.onclick=()=>{$("q").value=t;send();};$("chips").appendChild(b);});
+
+function snapshot(){
+  const {price,cost,mu,sd}=S.nv, cu=price-cost, cr=cu/(cu+cost), q=mu+invNorm(cr)*sd;
+  const r=solveLP(S.suppliers,S.demand), z=invNorm(S.sl/100), z95=invNorm(.95);
+  return JSON.stringify({
+    menu:{rule:"Chicken Lollipop -> BBQ Wings",support:.2142,confidence:.8219,lift:3.1499,
+      note:"Cold Coffee->Pizza has higher confidence (.8733) but lift only 1.29 because pizza is in 67.6% of bills"},
+    forecast:{model:"ARIMA(1,1,0)",aic:794.4,ljungBox:.893,mape:36,weeks:S.fc,upper:S.hi,
+      weaknesses:["no seasonal term though cold coffee peaks Apr-Jun","lower bound goes negative","anchors on an unusually low final week"]},
+    prep:{salePrice:price,unitCost:cost,salvage:0,meanDemand:mu,sdDemand:sd,
+      lostProfitIfShort:cu,costIfWasted:cost,criticalRatio:+cr.toFixed(4),optimalQty:+q.toFixed(2),target:Math.round(q)},
+    stock:{serviceLevel:S.sl,z:+z.toFixed(3),
+      items:S.items.map(i=>({item:i.n,safetyStock:+(z*i.ss/z95).toFixed(1),reorderPoint:+((i.rop-i.ss)+z*i.ss/z95).toFixed(1)}))},
+    suppliers:{categories:CATS,demand:S.demand,
+      table:S.suppliers.map(s=>({name:s.name,capacity:s.cap,costPerUnit:s.cost})),
+      allocation:r.alloc.map((row,i)=>({supplier:S.suppliers[i].name,units:row.map(Math.round)})),
+      weeklyCost:Math.round(r.cost)}
+  });
+}
+const SYS=`You are the operations analyst for a single mid-sized Indian restaurant. You are embedded in a live dashboard called Service Line, and you are speaking to the analyst who built it — an MBA student who will defend this work to a technical faculty panel.
+
+WHAT YOU KNOW
+Each question arrives with a JSON snapshot of the console's current state. That snapshot is the ground truth: it reflects whatever the user has just done with the sliders and any Excel file they have loaded. Five models feed it — association rules on the menu, an ARIMA demand forecast, a newsvendor prep target, a probabilistic reorder policy, and a cost-minimising supplier plan solved by minimum-cost flow.
+
+HOW TO ANSWER
+Lead with the answer, then the reason. Never open by restating the question.
+Two to four short paragraphs. No headings. No bullet lists unless the user asks for a list.
+Quote the actual figures from the snapshot, in rupees where the state uses rupees. Never invent, round away, or recall a number that is not in front of you.
+Explain any technical term the first time it appears, in one clause — "lift, meaning how much more often the pair sells than chance would predict" — then use it freely.
+Write the way a sharp operator talks: concrete nouns, active voice, no consultant filler. "Make two more pizzas" beats "consider optimising production volumes."
+
+HOW TO THINK
+Say what the number means for the kitchen, the till, or the purchase order — not merely what it is.
+When the user changes a slider, reason about the new state, not the baseline.
+Distinguish what the data supports from what it merely suggests. Association is not causation; a fitted forecast is not a promise.
+Where a figure rests on an assumption, name the assumption. The safety stock figures imply a lead time and lead-time variability that the source reports never state. The forecast has no seasonal term although cold coffee peaks every April to June, its lower confidence bound goes negative, and it anchors on an unusually low final week. All six items carrying near-identical buffers is unusual for a real menu and is worth a data audit.
+Volunteer these weaknesses when they bear on the question. Do not volunteer them when they do not.
+
+BOUNDARIES
+If the snapshot cannot answer the question, say exactly what is missing rather than guessing.
+If the user's premise is wrong, correct it plainly and briefly, then answer what they meant.
+You have no access to the source reports, the raw transactions, or anything outside the snapshot. Do not pretend otherwise.`;
+
+function bubble(cls,txt){const d=document.createElement("div");d.className="msg "+cls;d.textContent=txt;
+  $("chat").appendChild(d);$("chat").scrollTop=$("chat").scrollHeight;return d;}
+
+const PROV={
+  anthropic:{label:"Anthropic",models:[["claude-sonnet-5","Claude Sonnet 5"],["claude-haiku-4-5-20251001","Claude Haiku 4.5"],["claude-opus-5","Claude Opus 5"]],
+    build:(k,m,h)=>({url:"https://api.anthropic.com/v1/messages",
+      headers:{"content-type":"application/json","x-api-key":k,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
+      body:{model:m,max_tokens:900,system:SYS,messages:h}}),
+    read:d=>(d.content||[]).filter(b=>b.type==="text").map(b=>b.text).join("\n")},
+  openai:{label:"OpenAI",models:[["gpt-4o","GPT-4o"],["gpt-4o-mini","GPT-4o mini"],["gpt-4.1","GPT-4.1"]],
+    build:(k,m,h)=>({url:"https://api.openai.com/v1/chat/completions",
+      headers:{"content-type":"application/json",authorization:"Bearer "+k},
+      body:{model:m,max_tokens:900,messages:[{role:"system",content:SYS}].concat(h)}}),
+    read:d=>((d.choices||[])[0]||{}).message?.content||""},
+  google:{label:"Google Gemini",models:[["gemini-2.0-flash","Gemini 2.0 Flash"],["gemini-1.5-pro","Gemini 1.5 Pro"]],
+    build:(k,m,h)=>({url:"https://generativelanguage.googleapis.com/v1beta/models/"+m+":generateContent?key="+encodeURIComponent(k),
+      headers:{"content-type":"application/json"},
+      body:{system_instruction:{parts:[{text:SYS}]},
+        contents:h.map(x=>({role:x.role==="assistant"?"model":"user",parts:[{text:x.content}]})),
+        generationConfig:{maxOutputTokens:900}}}),
+    read:d=>(((d.candidates||[])[0]||{}).content?.parts||[]).map(x=>x.text).join("\n")},
+  nvidia:{label:"NVIDIA NIM",relay:true,models:[["nvidia/nemotron-3.5-lightning-30b-a3b","Nemotron 3.5 Lightning"],["meta/llama-3.3-70b-instruct","Llama 3.3 70B"],["nvidia/llama-3.1-nemotron-70b-instruct","Nemotron 70B"],["deepseek-ai/deepseek-r1","DeepSeek R1"]],
+    build:(k,m,h)=>({url:"https://integrate.api.nvidia.com/v1/chat/completions",
+      headers:{"content-type":"application/json",authorization:"Bearer "+k},
+      body:{model:m,max_tokens:900,temperature:.4,messages:[{role:"system",content:SYS}].concat(h)}}),
+    read:d=>((d.choices||[])[0]||{}).message?.content||""},
+  openrouter:{label:"OpenRouter",models:[["anthropic/claude-sonnet-4.5","Claude Sonnet 4.5"],["openai/gpt-4o","GPT-4o"],["google/gemini-2.0-flash-001","Gemini 2.0 Flash"]],
+    build:(k,m,h)=>({url:"https://openrouter.ai/api/v1/chat/completions",
+      headers:{"content-type":"application/json",authorization:"Bearer "+k},
+      body:{model:m,max_tokens:900,messages:[{role:"system",content:SYS}].concat(h)}}),
+    read:d=>((d.choices||[])[0]||{}).message?.content||""}
+};
+function detect(k){
+  if(/^nvapi-/i.test(k))return "nvidia";
+  if(/^sk-or-/i.test(k))return "openrouter";
+  if(/^sk-ant/i.test(k))return "anthropic";
+  if(/^AIza/.test(k))return "google";
+  if(/^sk-/i.test(k))return "openai";
+  return null;
+}
+function fillModels(){
+  const dl=$("modelList"); dl.innerHTML="";
+  const list=PROV[$("prov").value].models;
+  list.forEach(([v,l])=>{
+    const o=document.createElement("option"); o.value=v; o.label=l; dl.appendChild(o);
+  });
+  $("model").value=list[0][0];
+}
+$("prov").addEventListener("change",fillModels);
+fillModels();
+
+async function send(){
+  const q=$("q").value.trim(); if(!q)return;
+  const key=$("apiKey").value.trim();
+  if(!key){bubble("e","Add your API key in the panel on the right, then ask again.");return;}
+  $("q").value=""; bubble("u",q);
+  const think=bubble("a","Reading the console…");
+  $("bSend").disabled=true;
+  const P=PROV[$("prov").value];
+  S.history.push({role:"user",content:"Current console state:\n"+snapshot()+"\n\nQuestion: "+q});
+  try{
+    const cfg=P.build(key,$("model").value,S.history.slice(-8));
+    let res=null, direct=null;
+    try{
+      res=await fetch(cfg.url,{method:"POST",headers:cfg.headers,body:JSON.stringify(cfg.body)});
+    }catch(e){ direct=e; }
+    if(!res){
+      // provider blocks direct browser calls (CORS) — retry through the local relay
+      think.textContent="Routing through the local relay\u2026";
+      res=await fetch("/api",{method:"POST",headers:{"content-type":"application/json"},
+        body:JSON.stringify({url:cfg.url,headers:cfg.headers,body:cfg.body})});
+    }
+    if(!res.ok){
+      const e=await res.json().catch(()=>({}));
+      const m=(e.error&&(e.error.message||e.error))||"";
+      think.className="msg e";
+      think.textContent=res.status===401||res.status===403
+          ? P.label+" rejected that key. Check the key, or switch the provider above to match it."
+        :res.status===404?"That model isn't available on this key. Pick another from the Model list."
+        :res.status===429?"Rate limit reached. Wait a moment and try again."
+        :"Request failed ("+res.status+"). "+m;
+      S.history.pop(); return;
+    }
+    const txt=(P.read(await res.json())||"").trim();
+    think.textContent=txt||"That model returned nothing usable — it may be a reasoning-only response. Try another model id.";
+    S.history.push({role:"assistant",content:txt});
+  }catch(err){
+    think.className="msg e";
+    think.textContent=P.label+" blocks direct calls from the browser, and the local relay isn't running. "
+      +"Stop the server, then start it with:  python serve.py  \u2014 and reload this page. "
+      +"Or pick a different provider on the right.";
+    S.history.pop();
+  }finally{$("bSend").disabled=false;}
+}
+$("bSend").onclick=send;
+$("q").addEventListener("keydown",e=>{if(e.key==="Enter")send();});
+$("apiKey").addEventListener("input",e=>{
+  const k=e.target.value.trim(), guess=detect(k);
+  if(guess&&guess!==$("prov").value){$("prov").value=guess;fillModels();}
+  $("stat").innerHTML='<span class="dot'+(k?" live":"")+'"></span>'+
+    (k?PROV[$("prov").value].label+" ready":"No key");
+});
+
+/* ============ navigation ============ */
+const PAGES=[["line","Line"],["pairs","Pairs"],["demand","Demand"],["prep","Prep"],["stock","Stock"],["supply","Supply"],["analyst","Analyst"]];
+PAGES.forEach(([id,label],i)=>{
+  const b=document.createElement("button");
+  b.className="tk"+(i===0?" on":"");b.dataset.go=id;
+  b.innerHTML="<i>"+String(i+1).padStart(2,"0")+"</i>"+label;
+  b.onclick=()=>go(id);$("nav").appendChild(b);
+});
+let cur=0;
+function go(id){
+  cur=PAGES.findIndex(p=>p[0]===id);
+  document.querySelectorAll(".page").forEach(p=>p.classList.toggle("on",p.dataset.p===id));
+  document.querySelectorAll(".tk").forEach(t=>t.classList.toggle("on",t.dataset.go===id));
+  setTimeout(()=>Object.values(C).forEach(c=>c.resize()),40);
+}
+document.addEventListener("keydown",e=>{
+  if(e.key==="Escape"&&e.target.blur){e.target.blur();return;}
+  if(/input|select|textarea/i.test(e.target.tagName))return;
+  if(e.key>="1"&&e.key<="7"){e.preventDefault();go(PAGES[+e.key-1][0]);}
+  if(e.key==="ArrowRight"){e.preventDefault();go(PAGES[Math.min(cur+1,PAGES.length-1)][0]);}
+  if(e.key==="ArrowLeft"){e.preventDefault();go(PAGES[Math.max(cur-1,0)][0]);}
+});
+
+/* ============ theme ============ */
+function applyTheme(mode){
+  document.documentElement.setAttribute("data-theme",mode);
+  T=THEMES[mode]; Chart.defaults.color=T.text; Chart.defaults.borderColor=T.grid;
+  $("bTheme").textContent = mode==="dark" ? "Light" : "Dark";
+  try{localStorage.setItem("serviceLineTheme",mode);}catch(e){}
+  Object.values(C).forEach(c=>{
+    const sc=c.options.scales||{};
+    ["x","y"].forEach(ax=>{
+      if(!sc[ax])return;
+      if(sc[ax].grid&&sc[ax].grid.color)sc[ax].grid.color=T.grid;
+      if(sc[ax].border&&sc[ax].border.color)sc[ax].border.color=T.border;
+    });
+  });
+  C.lift.data.datasets[0].backgroundColor=[T.fill,T.neutral,T.neutral];
+  C.fc.data.datasets[0].borderColor=T.neutral; C.fc.data.datasets[0].backgroundColor=T.neutralFade;
+  C.fc.data.datasets[1].borderColor=T.fill;    C.fc.data.datasets[1].pointBackgroundColor=T.fill;
+  C.nv.data.datasets[0].borderColor=T.fill;    C.nv.data.datasets[1].borderColor=T.teal;
+  C.curve.data.datasets[0].borderColor=T.fill; C.curve.data.datasets[1].borderColor=T.teal;
+  C.line.data.datasets[0].backgroundColor=T.fill;
+  C.line.data.datasets[1].backgroundColor=T.teal;
+  C.line.data.datasets[2].backgroundColor=T.neutral;
+  renderStock(); renderSupply();
+  Object.values(C).forEach(c=>c.update());
+}
+$("bTheme").onclick=()=>applyTheme(document.documentElement.getAttribute("data-theme")==="dark"?"light":"dark");
+
+/* ============ wire ============ */
+buildCharts();
+[["sP","price"],["sC","cost"],["sM","mu"],["sS","sd"]].forEach(([id,k])=>
+  $(id).addEventListener("input",e=>{S.nv[k]=+e.target.value;renderPrep();}));
+$("sSl").addEventListener("input",e=>{S.sl=+e.target.value;renderStock();});
+$("sCap").addEventListener("input",renderCap);
+renderPrep(); renderStock(); renderSupply();
+let saved=null; try{saved=localStorage.getItem("serviceLineTheme");}catch(e){}
+if(!saved&&window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches)saved="dark";
+applyTheme(saved==="dark"?"dark":"light");
+</script>
+</body>
+</html>
