@@ -295,7 +295,7 @@ kbd{border:1px solid var(--rule);border-radius:2px;padding:1px 5px;font-family:v
       </div>
     </div>
     <div class="card"><h2>Connection</h2>
-      <label style="font-size:12px;color:var(--mute);display:block;margin-bottom:8px">API key</label>
+      <label id="apiKeyLabel" style="font-size:12px;color:var(--mute);display:block;margin-bottom:8px">API key</label>
       <input class="key" id="apiKey" type="password" placeholder="Paste any provider's key" autocomplete="off">
       <label style="font-size:12px;color:var(--mute);display:block;margin:16px 0 8px">Provider</label>
       <select class="key" id="prov">
@@ -304,6 +304,7 @@ kbd{border:1px solid var(--rule);border-radius:2px;padding:1px 5px;font-family:v
         <option value="nvidia">NVIDIA NIM</option>
         <option value="google">Google Gemini</option>
         <option value="openrouter">OpenRouter</option>
+        <option value="ollama">Ollama (local)</option>
       </select>
       <label style="font-size:12px;color:var(--mute);display:block;margin:16px 0 8px">Model <span style="color:var(--dim)">— pick one or type any id</span></label>
       <input class="key" id="model" list="modelList" autocomplete="off" spellcheck="false">
@@ -702,7 +703,12 @@ const PROV={
     build:(k,m,h)=>({url:"https://openrouter.ai/api/v1/chat/completions",
       headers:{"content-type":"application/json",authorization:"Bearer "+k},
       body:{model:m,max_tokens:900,messages:[{role:"system",content:SYS}].concat(h)}}),
-    read:d=>((d.choices||[])[0]||{}).message?.content||""}
+    read:d=>((d.choices||[])[0]||{}).message?.content||""},
+  ollama:{label:"Ollama (local)",models:[["llama3.2","Llama 3.2"],["qwen2.5","Qwen 2.5"],["mistral","Mistral"],["deepseek-r1","DeepSeek R1"]],
+    build:(k,m,h)=>({url:(k||"http://localhost:11434").replace(/\/+$/,"")+"/api/chat",
+      headers:{"content-type":"application/json"},
+      body:{model:m,stream:false,messages:[{role:"system",content:SYS}].concat(h)}}),
+    read:d=>(d.message&&d.message.content)||""}
 };
 function detect(k){
   if(/^nvapi-/i.test(k))return "nvidia";
@@ -720,13 +726,25 @@ function fillModels(){
   });
   $("model").value=list[0][0];
 }
-$("prov").addEventListener("change",fillModels);
+function updateStatus(){
+  const k=$("apiKey").value.trim(), ready=k||$("prov").value==="ollama";
+  $("stat").innerHTML='<span class="dot'+(ready?" live":"")+'"></span>'+
+    (ready?PROV[$("prov").value].label+" ready":"No key");
+}
+function syncKeyField(){
+  const isOllama=$("prov").value==="ollama";
+  $("apiKeyLabel").textContent=isOllama?"Server URL":"API key";
+  $("apiKey").type=isOllama?"text":"password";
+  $("apiKey").placeholder=isOllama?"http://localhost:11434 — blank uses this default":"Paste any provider's key";
+}
+$("prov").addEventListener("change",()=>{fillModels();updateStatus();syncKeyField();});
 fillModels();
+syncKeyField();
 
 async function send(){
   const q=$("q").value.trim(); if(!q)return;
   const key=$("apiKey").value.trim();
-  if(!key){bubble("e","Add your API key in the panel on the right, then ask again.");return;}
+  if(!key&&$("prov").value!=="ollama"){bubble("e","Add your API key in the panel on the right, then ask again.");return;}
   $("q").value=""; bubble("u",q);
   const think=bubble("a","Reading the console…");
   $("bSend").disabled=true;
@@ -771,8 +789,7 @@ $("q").addEventListener("keydown",e=>{if(e.key==="Enter")send();});
 $("apiKey").addEventListener("input",e=>{
   const k=e.target.value.trim(), guess=detect(k);
   if(guess&&guess!==$("prov").value){$("prov").value=guess;fillModels();}
-  $("stat").innerHTML='<span class="dot'+(k?" live":"")+'"></span>'+
-    (k?PROV[$("prov").value].label+" ready":"No key");
+  updateStatus();
 });
 
 /* ============ navigation ============ */

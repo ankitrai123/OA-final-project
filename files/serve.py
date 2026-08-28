@@ -12,6 +12,7 @@ Your API key passes through this process to the provider and is never
 written to disk or logged.
 """
 
+import ipaddress
 import json
 import socket
 import sys
@@ -44,6 +45,17 @@ ALLOWED_HOSTS = {
 }
 
 
+def host_allowed(host):
+    """Fixed providers above, plus localhost/private addresses for a local or
+    intranet-hosted Ollama server. Never proxies to an arbitrary public host."""
+    if host in ALLOWED_HOSTS or host == "localhost":
+        return True
+    try:
+        return ipaddress.ip_address(host).is_private
+    except ValueError:
+        return False
+
+
 class Handler(SimpleHTTPRequestHandler):
     def do_POST(self):
         if self.path != "/api":
@@ -56,7 +68,7 @@ class Handler(SimpleHTTPRequestHandler):
             url = payload["url"]
             host = urllib.parse.urlparse(url).hostname or ""
 
-            if host not in ALLOWED_HOSTS:
+            if not host_allowed(host):
                 self._json(403, {"error": {"message": "Host not allowed: " + host}})
                 return
 
@@ -97,7 +109,7 @@ if __name__ == "__main__":
     ip = lan_ip()
     if ip:
         print("  http://%s:%d   (share this on your intranet)" % (ip, PORT))
-    print("AI relay active for Anthropic, OpenAI, NVIDIA, Gemini, OpenRouter.")
+    print("AI relay active for Anthropic, OpenAI, NVIDIA, Gemini, OpenRouter, and local/intranet Ollama.")
     print("Press Ctrl+C to stop.\n")
     try:
         ThreadingHTTPServer((HOST, PORT), Handler).serve_forever()
