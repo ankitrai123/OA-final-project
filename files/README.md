@@ -77,6 +77,24 @@ into browser storage, or to disk, and it is gone when you close the tab. Because
 calls Anthropic directly, the key does travel from your machine — fine for a local demo, but
 regenerate it at console.anthropic.com after your presentation.
 
+### Using Ollama instead of a cloud key
+
+If your network blocks outbound calls to the AI providers (common on locked-down campus/office
+intranets), pick **Ollama (local)** from the Provider dropdown. It needs no API key and never
+leaves the network:
+
+1. Install [Ollama](https://ollama.com) and pull a model, e.g. `ollama pull llama3.2`.
+2. Leave the key field blank — it defaults to `http://localhost:11434`. Only fill it in if
+   Ollama is running elsewhere, e.g. `http://192.168.1.42:11434` for one shared instance on
+   your intranet.
+3. Ask a question as usual.
+
+If you get a CORS-style failure on the first try, Ollama's default origin allowlist doesn't
+include this page. Restart Ollama with `OLLAMA_ORIGINS=*` set (or list this dashboard's exact
+origin) and it'll allow the direct browser call. Failing that, `serve.py`'s relay (`/api`) will
+proxy to `localhost` and private-network addresses automatically — the fixed-provider allowlist
+doesn't apply there.
+
 ## Files
 
 ```
