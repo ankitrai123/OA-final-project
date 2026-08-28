@@ -13,13 +13,27 @@ written to disk or logged.
 """
 
 import json
+import socket
 import sys
 import urllib.error
 import urllib.parse
 import urllib.request
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
+HOST = "0.0.0.0"  # listen on every interface so other machines on the intranet can reach it
 PORT = 8000
+
+
+def lan_ip():
+    """Best-effort guess at this machine's LAN address, for printing a shareable URL."""
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect(("8.8.8.8", 80))  # no packet actually sent; just picks the outbound interface
+        return s.getsockname()[0]
+    except OSError:
+        return None
+    finally:
+        s.close()
 
 ALLOWED_HOSTS = {
     "api.anthropic.com",
@@ -78,10 +92,14 @@ class Handler(SimpleHTTPRequestHandler):
 
 
 if __name__ == "__main__":
-    print("Service Line running at http://localhost:%d" % PORT)
+    print("Service Line running at:")
+    print("  http://localhost:%d          (this machine)" % PORT)
+    ip = lan_ip()
+    if ip:
+        print("  http://%s:%d   (share this on your intranet)" % (ip, PORT))
     print("AI relay active for Anthropic, OpenAI, NVIDIA, Gemini, OpenRouter.")
     print("Press Ctrl+C to stop.\n")
     try:
-        ThreadingHTTPServer(("127.0.0.1", PORT), Handler).serve_forever()
+        ThreadingHTTPServer((HOST, PORT), Handler).serve_forever()
     except KeyboardInterrupt:
         print("\nStopped.")

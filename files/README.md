@@ -19,6 +19,26 @@ AI analyst will fail — browsers block API calls from `file://` pages. Use the 
 Chart.js and SheetJS are bundled in `vendor/`, so the dashboard works with no internet.
 Only the AI analyst needs a connection.
 
+## Hosting on your intranet
+
+Run `python serve.py` instead of the plain `http.server` command above — it listens on every
+network interface, not just this machine, and prints the URL to hand out:
+
+```
+Service Line running at:
+  http://localhost:8000          (this machine)
+  http://192.168.1.42:8000       (share this on your intranet)
+```
+
+Anyone on the same network can then open that second URL in their browser. Two things to check:
+
+- Open port 8000 to inbound connections in the host machine's firewall (Windows Firewall, `ufw`,
+  etc.) — most block it by default.
+- Everyone reaches the AI relay (`/api`) too, since it's the same server. It only forwards to the
+  five providers in `ALLOWED_HOSTS` and still needs a valid key in the request, but there's no
+  login in front of it — fine for a trusted classroom/office network during a demo, not something
+  to leave running unattended on an open network.
+
 ## Pages
 
 | Key | Page | What it does |
