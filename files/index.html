@@ -720,7 +720,12 @@ function fillModels(){
   });
   $("model").value=list[0][0];
 }
-$("prov").addEventListener("change",fillModels);
+function updateStatus(){
+  const k=$("apiKey").value.trim();
+  $("stat").innerHTML='<span class="dot'+(k?" live":"")+'"></span>'+
+    (k?PROV[$("prov").value].label+" ready":"No key");
+}
+$("prov").addEventListener("change",()=>{fillModels();updateStatus();});
 fillModels();
 
 async function send(){
@@ -771,8 +776,7 @@ $("q").addEventListener("keydown",e=>{if(e.key==="Enter")send();});
 $("apiKey").addEventListener("input",e=>{
   const k=e.target.value.trim(), guess=detect(k);
   if(guess&&guess!==$("prov").value){$("prov").value=guess;fillModels();}
-  $("stat").innerHTML='<span class="dot'+(k?" live":"")+'"></span>'+
-    (k?PROV[$("prov").value].label+" ready":"No key");
+  updateStatus();
 });
 
 /* ============ navigation ============ */
